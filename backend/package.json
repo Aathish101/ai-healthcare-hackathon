@@ -1,0 +1,26 @@
+{
+  "name": "preventai-backend",
+  "version": "1.0.0",
+  "description": "Aurevia Health Backend API - Early Health Risk Prediction Platform",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "keywords": [
+    "healthcare",
+    "ai",
+    "risk-prediction"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "mongoose": "^8.23.0"
+  }
+}
