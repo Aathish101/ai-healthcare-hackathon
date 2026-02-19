@@ -1,20 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../components/LoadingSpinner'
+import { useTranslation } from 'react-i18next'
 
 const AssessmentPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuth()
 
-
+  // 1. STATE INITIALIZATION (MUST BE AT TOP)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [bmi, setBmi] = useState(null)
   const [formData, setFormData] = useState({
-    age: '',
-    gender: '',
+    biologicalAge: '',
+    birthGender: '',
     height: '',
     weight: '',
     bmi: '',
@@ -25,407 +28,335 @@ const AssessmentPage = () => {
     bloodPressure: '',
     bloodSugar: '',
     stressLevel: '',
-    sleepHours: ''
+    sleepHours: '',
+    occupation: '',
+    workType: '',
+    workingHours: '',
+    nightShift: '',
+    workStress: '',
+    useSmartwatch: '',
+    dailySteps: '',
+    avgHeartRate: '',
+    dietType: '',
+    fastFoodFrequency: '',
+    waterIntake: '',
+    screenTime: '',
+    sleepQuality: '',
+    physicalActivity: '',
+    fruitVeg: ''
   })
 
+  // 2. LIFECYCLE EFFECTS
+  useEffect(() => {
+    if (!sessionStorage.getItem('selectedProfileId')) {
+      toast.error('Please select a profile first')
+      navigate('/profiles')
+    }
+  }, [navigate])
+
+  // Real-time BMI Calculation Logic
+  useEffect(() => {
+    if (formData.height && formData.weight) {
+      const h = parseFloat(formData.height) / 100
+      const w = parseFloat(formData.weight)
+      if (h > 0) {
+        const calculatedBmi = (w / (h * h)).toFixed(1)
+        setBmi(calculatedBmi)
+        setFormData(prev => ({ ...prev, bmi: calculatedBmi }))
+      }
+    }
+  }, [formData.height, formData.weight])
+
+  // 3. EVENT HANDLERS
   const handleChange = (e) => {
     const { name, value } = e.target
-    setFormData(prev => {
-      const updated = { ...prev, [name]: value }
-
-      // Auto-calculate BMI if height and weight are provided
-      if (name === 'height' || name === 'weight') {
-        const height = name === 'height' ? parseFloat(value) : parseFloat(prev.height)
-        const weight = name === 'weight' ? parseFloat(value) : parseFloat(prev.weight)
-
-        if (height && weight && height > 0 && weight > 0) {
-          const heightInMeters = height / 100
-          const bmi = (weight / (heightInMeters * heightInMeters)).toFixed(1)
-          updated.bmi = bmi
-        } else {
-          updated.bmi = ''
-        }
-      }
-
-      return updated
-    })
+    setFormData(prev => ({ ...prev, [name]: value }))
     setError('')
   }
 
   const validateForm = () => {
-    const required = ['age', 'gender', 'familyHistory', 'smoking', 'alcoholConsumption', 'exerciseFrequency', 'stressLevel', 'sleepHours']
-
+    const required = [
+      'biologicalAge', 'birthGender', 'familyHistory', 'smoking',
+      'alcoholConsumption', 'exerciseFrequency', 'stressLevel',
+      'sleepHours', 'workType', 'nightShift', 'dietType',
+      'fastFoodFrequency', 'sleepQuality', 'physicalActivity',
+      'useSmartwatch'
+    ]
     for (const field of required) {
       if (!formData[field]) {
         setError(`Please fill in all required fields. Missing: ${field}`)
         return false
       }
     }
-
-    // Validate numeric fields
-    if (formData.age && (formData.age < 1 || formData.age > 120)) {
-      setError('Age must be between 1 and 120')
-      return false
-    }
-
-    if (formData.stressLevel && (formData.stressLevel < 1 || formData.stressLevel > 10)) {
-      setError('Stress level must be between 1 and 10')
-      return false
-    }
-
-    if (formData.exerciseFrequency && (formData.exerciseFrequency < 0 || formData.exerciseFrequency > 7)) {
-      setError('Exercise frequency must be between 0 and 7 days')
-      return false
-    }
-
-    if (formData.bloodPressure && !/^\d{2,3}\/\d{2,3}$/.test(formData.bloodPressure)) {
-      setError('Blood pressure must be in format "systolic/diastolic" (e.g., 120/80)')
-      return false
-    }
-
-    // Validate height and weight ranges
-    if (formData.height) {
-      const height = parseFloat(formData.height)
-      if (height < 100 || height > 250) {
-        setError('Height must be between 100 and 250 cm. Please check your input.')
-        return false
-      }
-    }
-
-    if (formData.weight) {
-      const weight = parseFloat(formData.weight)
-      if (weight < 20 || weight > 300) {
-        setError('Weight must be between 20 and 300 kg. Please check your input.')
-        return false
-      }
-    }
-
-    // Validate BMI if calculated
-    if (formData.bmi) {
-      const bmi = parseFloat(formData.bmi)
-      if (bmi < 10 || bmi > 60) {
-        setError(`Calculated BMI (${bmi.toFixed(1)}) is outside the valid range (10-60). Please check your height and weight values.`)
-        return false
-      }
-    }
-
     return true
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    if (!validateForm()) {
-      return
-    }
+    if (!validateForm()) return
 
     setLoading(true)
     setError('')
 
     try {
-      // Prepare data for API
-      // Don't send BMI if it's invalid - let backend calculate it
-      const calculatedBMI = formData.bmi ? parseFloat(formData.bmi) : null
-      const validBMI = calculatedBMI && calculatedBMI >= 10 && calculatedBMI <= 60 ? calculatedBMI : undefined
-
-      const assessmentData = {
-        userId: user.uid,
-        age: parseInt(formData.age),
-        gender: formData.gender,
-        height: formData.height ? parseFloat(formData.height) : undefined,
-        weight: formData.weight ? parseFloat(formData.weight) : undefined,
-        bmi: validBMI, // Only send if valid, otherwise let backend calculate
-        familyHistory: formData.familyHistory,
-        smoking: formData.smoking,
-        alcoholConsumption: formData.alcoholConsumption,
-        exerciseFrequency: parseInt(formData.exerciseFrequency),
-        bloodPressure: formData.bloodPressure || undefined,
-        bloodSugar: formData.bloodSugar ? parseFloat(formData.bloodSugar) : undefined,
-        stressLevel: parseInt(formData.stressLevel),
-        sleepHours: parseFloat(formData.sleepHours)
+      // Map frontend fields (biologicalAge, birthGender) to backend model (age, gender)
+      const payload = {
+        profileId: sessionStorage.getItem('selectedProfileId'),
+        ...formData,
+        age: parseInt(formData.biologicalAge),
+        gender: formData.birthGender,
+        height: parseFloat(formData.height),
+        weight: parseFloat(formData.weight),
+        bmi: parseFloat(bmi),
+        exerciseFrequency: parseInt(formData.exerciseFrequency) || 0,
+        stressLevel: parseInt(formData.stressLevel) || 0,
+        sleepHours: parseFloat(formData.sleepHours) || 0,
+        workingHours: parseFloat(formData.workingHours) || 0,
+        screenTime: parseFloat(formData.screenTime) || 0,
+        waterIntake: parseFloat(formData.waterIntake) || 0,
       }
 
-      const response = await axios.post('http://localhost:5000/api/assessment', assessmentData)
-
-      // Store results in sessionStorage for results page
+      const response = await axios.post('http://localhost:5000/api/assessment/submit', payload)
       sessionStorage.setItem('assessmentResults', JSON.stringify(response.data.data))
-
-      toast.success('Assessment completed successfully!')
+      toast.success('Biometric Analysis Complete')
       navigate('/results')
     } catch (err) {
-      console.error('Assessment error:', err)
-
-      // Display detailed validation errors
-      if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
-        const errorMessages = err.response.data.errors.map(e => e.msg).join(', ')
-        toast.error(`Validation failed: ${errorMessages}`)
-        setError(`Validation failed: ${errorMessages}`)
-      } else {
-        const errorMsg = err.response?.data?.message ||
-          'Failed to process assessment. Please check your inputs and try again.'
-        toast.error(errorMsg)
-        setError(errorMsg)
-      }
+      console.error('Submission failed:', err)
+      const errorMsg = err.response?.data?.message || 'Assessment engine synchronization failed. Please verify all metrics.'
+      toast.error(errorMsg)
+      setError(errorMsg)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-16 px-4 bg-white">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Health Assessment</h1>
-          <p className="text-xl text-gray-600">
-            Fill in your health information to get personalized risk predictions
+        <div className="text-center mb-16 animate-fade-up">
+          <span className="inline-block px-4 py-1.5 mb-4 text-[10px] font-black tracking-widest text-white uppercase bg-black rounded-full">
+            {t('biometric_analysis')}
+          </span>
+          <h1 className="text-5xl font-black text-black mb-6 tracking-tighter">
+            {t('health_assessment')}
+          </h1>
+          <p className="text-xl text-gray-400 font-medium max-w-2xl mx-auto">
+            {t('assessment_desc')}
           </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
+          <div className="bg-black text-white px-6 py-4 rounded-2xl mb-8 flex items-center gap-3 animate-slide-in">
+            <span className="font-bold text-xs uppercase tracking-widest">Error:</span>
+            <span className="text-sm font-medium opacity-80">{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="card space-y-6">
-          {/* Personal Information */}
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Personal Information</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="label">Age *</label>
-                <input
-                  type="number"
-                  name="age"
-                  value={formData.age}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                  min="1"
-                  max="120"
-                />
+        <form onSubmit={handleSubmit} className="space-y-12">
+          {/* Section: Core Metrics */}
+          <div className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-10 shadow-sm hover:shadow-xl transition-all">
+            <h2 className="text-2xl font-black text-black mb-8 flex items-center gap-3 tracking-tighter">
+              <span className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center text-xs">01</span>
+              {t('primary_indicators')}
+            </h2>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="label">{t('bio_age')}</label>
+                <input type="number" name="biologicalAge" value={formData.biologicalAge} onChange={handleChange} className="input-field" required min="1" max="120" />
               </div>
-              <div>
-                <label className="label">Gender *</label>
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                >
-                  <option value="">Select Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
+              <div className="space-y-2">
+                <label className="label">{t('birth_gender')}</label>
+                <select name="birthGender" value={formData.birthGender} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select')}</option>
+                  <option value="Male">{t('male')}</option>
+                  <option value="Female">{t('female')}</option>
+                  <option value="Other">{t('other')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('height_cm')}</label>
+                <input type="number" name="height" value={formData.height} onChange={handleChange} className="input-field" placeholder="175" />
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('weight_kg')}</label>
+                <input type="number" name="weight" value={formData.weight} onChange={handleChange} className="input-field" placeholder="70" />
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Medical History */}
+          <div className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-10 shadow-sm hover:shadow-xl transition-all">
+            <h2 className="text-2xl font-black text-black mb-8 flex items-center gap-3 tracking-tighter">
+              <span className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center text-xs">02</span>
+              {t('clinical_context')}
+            </h2>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="label">{t('family_history')}</label>
+                <select name="familyHistory" value={formData.familyHistory} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select')}</option>
+                  <option value="Yes">{t('history_chronic')}</option>
+                  <option value="No">{t('no_history')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('tobacco_usage')}</label>
+                <select name="smoking" value={formData.smoking} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select')}</option>
+                  <option value="Yes">{t('active_user')}</option>
+                  <option value="No">{t('non_user')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('blood_pressure')}</label>
+                <input type="text" name="bloodPressure" value={formData.bloodPressure} onChange={handleChange} className="input-field" placeholder="120/80" />
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('glucose')}</label>
+                <input type="number" name="bloodSugar" value={formData.bloodSugar} onChange={handleChange} className="input-field" placeholder="95" />
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Lifestyle */}
+          <div className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-10 shadow-sm hover:shadow-xl transition-all">
+            <h2 className="text-2xl font-black text-black mb-8 flex items-center gap-3 tracking-tighter">
+              <span className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center text-xs">03</span>
+              {t('lifestyle_habits')}
+            </h2>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="label">{t('diet_archetype')}</label>
+                <select name="dietType" value={formData.dietType} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select_diet')}</option>
+                  <option value="Vegetarian">{t('vegetarian')}</option>
+                  <option value="Non-Vegetarian">{t('non_vegetarian')}</option>
+                  <option value="Vegan">{t('vegan')}</option>
+                  <option value="Mixed">{t('mixed_balance')}</option>
+                  <option value="High Protein">{t('high_protein')}</option>
+                  <option value="Junk Food Frequent">{t('processed_food')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('fast_food_freq')}</label>
+                <select name="fastFoodFrequency" value={formData.fastFoodFrequency} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select_frequency')}</option>
+                  <option value="Rare">{t('rarely')}</option>
+                  <option value="Weekly">{t('once_weekly')}</option>
+                  <option value="2-3 times/week">{t('two_three_weekly')}</option>
+                  <option value="Daily">{t('daily_intake')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('alcohol_usage')}</label>
+                <select name="alcoholConsumption" value={formData.alcoholConsumption} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select')}</option>
+                  <option value="Low">{t('minimal_none')}</option>
+                  <option value="Moderate">{t('occasional')}</option>
+                  <option value="High">{t('regular')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('weekly_exercise')}</label>
+                <input type="number" name="exerciseFrequency" value={formData.exerciseFrequency} onChange={handleChange} className="input-field" required min="0" max="7" />
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('physical_intensity')}</label>
+                <select name="physicalActivity" value={formData.physicalActivity} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select')}</option>
+                  <option value="Sedentary">{t('sedentary')}</option>
+                  <option value="Light">{t('light')}</option>
+                  <option value="Moderate">{t('gym_active')}</option>
+                  <option value="Intense">{t('intense')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('subjective_stress')}</label>
+                <input type="number" name="stressLevel" value={formData.stressLevel} onChange={handleChange} className="input-field" required min="1" max="10" />
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('avg_sleep_hrs')}</label>
+                <input type="number" name="sleepHours" value={formData.sleepHours} onChange={handleChange} className="input-field" required step="0.5" />
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('sleep_quality')}</label>
+                <select name="sleepQuality" value={formData.sleepQuality} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select')}</option>
+                  <option value="Poor">{t('poor_interrupted')}</option>
+                  <option value="Moderate">{t('moderate')}</option>
+                  <option value="Good">{t('good_restful')}</option>
+                  <option value="Excellent">{t('excellent_deep')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('working_hours_daily')}</label>
+                <input type="number" name="workingHours" value={formData.workingHours} onChange={handleChange} className="input-field" required min="0" max="24" />
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('screen_time_daily')}</label>
+                <input type="number" name="screenTime" value={formData.screenTime} onChange={handleChange} className="input-field" required min="0" max="24" />
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('water_intake_daily')}</label>
+                <input type="number" name="waterIntake" value={formData.waterIntake} onChange={handleChange} className="input-field" required step="0.1" min="0" />
+              </div>
+            </div>
+          </div>
+
+          {/* Section: Occupation & Connectivity */}
+          <div className="bg-white border-2 border-gray-100 rounded-[2.5rem] p-10 shadow-sm hover:shadow-xl transition-all">
+            <h2 className="text-2xl font-black text-black mb-8 flex items-center gap-3 tracking-tighter">
+              <span className="w-8 h-8 bg-black text-white rounded-full flex items-center justify-center text-xs">04</span>
+              {t('occupational_context')}
+            </h2>
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="label">{t('occupational_archetype')}</label>
+                <select name="workType" value={formData.workType} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select_archetype')}</option>
+                  <option value="Student">{t('student_research')}</option>
+                  <option value="Office">{t('office_desk')}</option>
+                  <option value="Manual">{t('manual_labor')}</option>
+                  <option value="Remote">{t('remote_hybrid')}</option>
+                  <option value="Business">{t('business_leadership')}</option>
+                  <option value="Freelancer">{t('independent_freelance')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('circadian_protocol')}</label>
+                <select name="nightShift" value={formData.nightShift} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select_protocol')}</option>
+                  <option value="No">{t('diurnal_rhythm')}</option>
+                  <option value="Yes">{t('nocturnal_rhythm')}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="label">{t('biometric_wearable')}</label>
+                <select name="useSmartwatch" value={formData.useSmartwatch} onChange={handleChange} className="input-field" required>
+                  <option value="">{t('select_status')}</option>
+                  <option value="Yes">{t('active_wearable')}</option>
+                  <option value="No">{t('inactive_wearable')}</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Physical Measurements */}
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Physical Measurements</h2>
-            <div className="grid md:grid-cols-3 gap-6">
-              <div>
-                <label className="label">Height (cm)</label>
-                <input
-                  type="number"
-                  name="height"
-                  value={formData.height}
-                  onChange={handleChange}
-                  className="input-field"
-                  min="100"
-                  max="250"
-                  step="0.1"
-                  placeholder="e.g., 175"
-                />
-                <p className="text-xs text-gray-500 mt-1">Enter height in centimeters (100-250 cm)</p>
-              </div>
-              <div>
-                <label className="label">Weight (kg)</label>
-                <input
-                  type="number"
-                  name="weight"
-                  value={formData.weight}
-                  onChange={handleChange}
-                  className="input-field"
-                  min="20"
-                  max="300"
-                  step="0.1"
-                  placeholder="e.g., 70"
-                />
-                <p className="text-xs text-gray-500 mt-1">Enter weight in kilograms (20-300 kg)</p>
-              </div>
-              <div>
-                <label className="label">BMI (auto-calculated)</label>
-                <input
-                  type="text"
-                  name="bmi"
-                  value={formData.bmi ? (parseFloat(formData.bmi) < 10 || parseFloat(formData.bmi) > 60 ? 'Invalid' : formData.bmi) : ''}
-                  readOnly
-                  className={`input-field bg-gray-100 ${formData.bmi && (parseFloat(formData.bmi) < 10 || parseFloat(formData.bmi) > 60) ? 'border-red-300 text-red-600' : ''}`}
-                  placeholder="Auto-calculated"
-                />
-                {formData.bmi && (parseFloat(formData.bmi) < 10 || parseFloat(formData.bmi) > 60) && (
-                  <p className="text-xs text-red-600 mt-1">Please check your height and weight values</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Health History */}
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Health History</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="label">Family History of Chronic Diseases *</label>
-                <select
-                  name="familyHistory"
-                  value={formData.familyHistory}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                >
-                  <option value="">Select</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Smoking Status *</label>
-                <select
-                  name="smoking"
-                  value={formData.smoking}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                >
-                  <option value="">Select</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Lifestyle Factors */}
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Lifestyle Factors</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="label">Alcohol Consumption *</label>
-                <select
-                  name="alcoholConsumption"
-                  value={formData.alcoholConsumption}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                >
-                  <option value="">Select</option>
-                  <option value="Low">Low</option>
-                  <option value="Moderate">Moderate</option>
-                  <option value="High">High</option>
-                </select>
-              </div>
-              <div>
-                <label className="label">Exercise Frequency (days per week) *</label>
-                <input
-                  type="number"
-                  name="exerciseFrequency"
-                  value={formData.exerciseFrequency}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                  min="0"
-                  max="7"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Medical Tests (Optional) */}
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Medical Tests (Optional)</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="label">Blood Pressure (e.g., 120/80)</label>
-                <input
-                  type="text"
-                  name="bloodPressure"
-                  value={formData.bloodPressure}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="systolic/diastolic"
-                  pattern="^\d{2,3}\/\d{2,3}$"
-                />
-              </div>
-              <div>
-                <label className="label">Blood Sugar (mg/dL)</label>
-                <input
-                  type="number"
-                  name="bloodSugar"
-                  value={formData.bloodSugar}
-                  onChange={handleChange}
-                  className="input-field"
-                  min="50"
-                  max="500"
-                  step="0.1"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Mental Health */}
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Mental Health & Sleep</h2>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <label className="label">Stress Level (1-10) *</label>
-                <input
-                  type="number"
-                  name="stressLevel"
-                  value={formData.stressLevel}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                  min="1"
-                  max="10"
-                />
-                <p className="text-sm text-gray-500 mt-1">1 = Very Low, 10 = Very High</p>
-              </div>
-              <div>
-                <label className="label">Sleep Hours per Night *</label>
-                <input
-                  type="number"
-                  name="sleepHours"
-                  value={formData.sleepHours}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                  min="0"
-                  max="24"
-                  step="0.5"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <div className="pt-6">
+          <div className="pt-8">
             <button
               type="submit"
               disabled={loading}
-              className="w-full btn-primary text-lg py-4 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full btn-primary py-6 text-xl tracking-tighter"
             >
-              {loading ? <LoadingSpinner /> : 'Get Health Risk Assessment'}
+              {loading ? <LoadingSpinner /> : t('generate_audit')}
             </button>
+            <p className="text-center text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-6">
+              {t('encrypted_transmission')}
+            </p>
           </div>
         </form>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }
 
 export default AssessmentPage
-

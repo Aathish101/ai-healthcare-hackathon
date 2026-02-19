@@ -10,6 +10,14 @@ import assessmentRoutes from './routes/assessmentRoutes.js';
 import healthRoutes from './routes/healthRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import profileRoutes from './routes/profile.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import pdfRoutes from './routes/pdfRoutes.js';
+
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Connect to MongoDB
 connectDB();
@@ -25,6 +33,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Request logging
 app.use((req, res, next) => {
@@ -34,9 +43,17 @@ app.use((req, res, next) => {
 
 // Routes
 app.use('/api/assessment', assessmentRoutes);
+app.use('/api/assessments', assessmentRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
+
+// Register /api/profiles consistently
+app.use('/api/profiles', profileRoutes);
+app.use('/api/pdf', pdfRoutes);
+
+
+console.log('✅ Routes registered: assessment, health, auth, chat, profile(s)');
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -48,8 +65,11 @@ app.get('/', (req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error(err);
-  res.status(500).json({ message: err.message });
+  console.error('SERVER ERROR:', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error'
+  });
 });
 
 // 404 handler

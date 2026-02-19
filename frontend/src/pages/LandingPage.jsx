@@ -5,132 +5,133 @@ import {
   ShieldCheckIcon,
   ChartBarIcon,
   HeartIcon,
-  SparklesIcon,
-  CheckCircleIcon
+  SparklesIcon
 } from '../components/Icons'
 
+import { useTranslation } from 'react-i18next'
+
 const LandingPage = () => {
+  const { t } = useTranslation()
   const { isAuthenticated } = useAuth()
-  
+
   const features = [
     {
       icon: <ShieldCheckIcon className="w-8 h-8" />,
-      title: 'Early Risk Detection',
-      description: 'Identify potential health risks before they become serious problems'
+      title: t('feature_risk_title'),
+      description: t('feature_risk_desc')
     },
     {
       icon: <ChartBarIcon className="w-8 h-8" />,
-      title: 'AI-Powered Analysis',
-      description: 'Advanced algorithms analyze your health data to provide accurate risk assessments'
+      title: t('feature_ai_title'),
+      description: t('feature_ai_desc')
     },
     {
       icon: <HeartIcon className="w-8 h-8" />,
-      title: 'Personalized Insights',
-      description: 'Receive tailored recommendations based on your unique health profile'
+      title: t('feature_protocol_title'),
+      description: t('feature_protocol_desc')
     },
     {
       icon: <SparklesIcon className="w-8 h-8" />,
-      title: 'Preventive Care',
-      description: 'Take proactive steps to maintain and improve your health'
+      title: t('feature_points_title'),
+      description: t('feature_points_desc')
     }
   ]
 
   const benefits = [
-    'Predict risk for 5 major lifestyle diseases',
-    'Get personalized health recommendations',
-    'Track your health score over time',
-    'Download detailed health reports',
-    '100% privacy-focused and secure'
+    t('benefit_1'),
+    t('benefit_2'),
+    t('benefit_3'),
+    t('benefit_4'),
+    t('benefit_5')
   ]
 
   return (
-    <div className="min-h-screen">
+    <div className="bg-white">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-medical-blue via-blue-600 to-medical-dark text-white py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6">
-              Early Health Risk Prediction
-            </h1>
-            <p className="text-xl md:text-2xl mb-8 text-blue-100 max-w-3xl mx-auto">
-              Take control of your health with AI-powered preventive care.
-              Predict and prevent lifestyle diseases before they impact your life.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link 
-                to={isAuthenticated ? '/dashboard' : '/login'} 
-                className="btn-primary bg-white text-medical-blue hover:bg-gray-100 text-lg px-8 py-4"
-              >
-                {isAuthenticated ? 'Go to Dashboard' : 'Start Free Assessment'}
-              </Link>
-              <a href="#features" className="btn-secondary border-white text-white hover:bg-white/10 text-lg px-8 py-4">
-                Learn More
-              </a>
-            </div>
+      <section className="relative min-h-screen flex flex-col justify-center items-center bg-black overflow-hidden px-6">
+        <div className="absolute inset-0 z-0">
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover opacity-50 grayscale"
+          >
+            <source src="/health-bg.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-black"></div>
+        </div>
+
+        <div className="relative z-10 text-center max-w-5xl">
+          <div className="inline-block px-4 py-1.5 mb-8 text-[10px] font-black tracking-[0.4em] text-white uppercase border border-white/20 rounded-full animate-fade-up">
+            {t('hero_tagline')}
+          </div>
+          <h1 className="text-6xl md:text-8xl font-black text-white mb-8 tracking-tighter leading-tight animate-slide-in" dangerouslySetInnerHTML={{ __html: t('hero_title').replace('Health ', 'Health<br />') }}>
+          </h1>
+          <p className="text-xl md:text-2xl text-gray-400 max-w-2xl mx-auto font-medium mb-12 animate-fade-up">
+            {t('hero_description')}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-6 justify-center animate-fade-up">
+            <Link
+              to={isAuthenticated ? '/dashboard' : '/login'}
+              className="btn-primary py-5 px-12 group"
+            >
+              {t('btn_initialize')}
+              <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">About Ayurevia Health</h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Ayurevia Health is a cutting-edge health risk prediction platform that uses advanced
-              algorithms to analyze your health indicators and predict early risks for major
-              lifestyle diseases including Diabetes, Heart Disease, Hypertension, Obesity, and Stress Disorders.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8 items-center mt-12">
+      {/* Philosophy Section */}
+      <section className="py-32 bg-white">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-24 items-center">
             <div>
-              <h3 className="text-2xl font-semibold text-gray-900 mb-4">Why Ayurevia Health?</h3>
-              <p className="text-gray-600 mb-6">
-                Early detection is the key to preventing serious health conditions. Our platform
-                combines medical research with AI technology to provide you with actionable insights
-                about your health risks.
+              <span className="text-[10px] font-black tracking-widest text-gray-400 uppercase mb-4 block">{t('institutional_framework')}</span>
+              <h2 className="text-5xl font-black text-black mb-8 tracking-tighter uppercase">{t('philosophy_title_1')}<br />{t('philosophy_title_2')}</h2>
+              <p className="text-xl text-gray-500 font-medium leading-relaxed mb-10">
+                {t('philosophy_desc')}
               </p>
-              <ul className="space-y-3">
+              <div className="space-y-6">
                 {benefits.map((benefit, index) => (
-                  <li key={index} className="flex items-start">
-                    <CheckCircleIcon className="w-6 h-6 text-medical-blue mr-3 flex-shrink-0 mt-0.5" />
-                    <span className="text-gray-700">{benefit}</span>
-                  </li>
+                  <div key={index} className="flex items-center gap-4 group">
+                    <div className="w-6 h-6 rounded-full border-2 border-black flex items-center justify-center group-hover:bg-black transition-colors">
+                      <div className="w-1.5 h-1.5 bg-black group-hover:bg-white rounded-full"></div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-800 uppercase tracking-wide">{benefit}</span>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
-            <div className="bg-gradient-to-br from-medical-light to-blue-100 rounded-2xl p-8">
-              <div className="text-center">
-                <div className="text-6xl font-bold text-medical-blue mb-4">5</div>
-                <div className="text-2xl font-semibold text-gray-900 mb-2">Disease Risk Categories</div>
-                <div className="text-gray-600">Comprehensive health analysis</div>
+            <div className="bg-gray-50 rounded-[4rem] p-16 border-2 border-gray-100 relative group overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-black/5 rounded-full -mr-20 -mt-20 group-hover:scale-110 transition-transform"></div>
+              <div className="relative z-10">
+                <div className="text-8xl font-black text-black mb-4">05</div>
+                <h3 className="text-2xl font-black text-black uppercase tracking-tighter mb-4">{t('critical_vectors')}</h3>
+                <p className="text-gray-400 font-bold uppercase tracking-widest text-xs leading-loose">
+                  {t('vector_list')}
+                </p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Key Features</h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-              Everything you need to understand and improve your health
-            </p>
+      {/* Features Grid */}
+      <section className="py-32 bg-black text-white">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="mb-24">
+            <h2 className="text-4xl font-black tracking-tighter uppercase">{t('technology_stack')}</h2>
           </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
             {features.map((feature, index) => (
-              <div key={index} className="card text-center">
-                <div className="text-medical-blue mb-4 flex justify-center">
+              <div key={index} className="group border-l border-white/10 pl-8 transition-colors hover:border-white">
+                <div className="text-gray-600 mb-8 transition-colors group-hover:text-white">
                   {feature.icon}
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600">
+                <h3 className="text-xl font-black mb-4 uppercase tracking-tighter">{feature.title}</h3>
+                <p className="text-gray-500 text-sm font-medium leading-relaxed group-hover:text-gray-300 transition-colors">
                   {feature.description}
                 </p>
               </div>
@@ -139,19 +140,18 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-medical-blue text-white">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold mb-6">Ready to Take Control of Your Health?</h2>
-          <p className="text-xl text-blue-100 mb-8">
-            Get your personalized health risk assessment in just a few minutes.
-            It's free, fast, and completely confidential.
+      {/* Final CTA */}
+      <section className="py-32 bg-white text-center">
+        <div className="max-w-4xl mx-auto px-6">
+          <h2 className="text-5xl font-black text-black mb-8 tracking-tighter uppercase">{t('audit_your_health')}</h2>
+          <p className="text-xl text-gray-500 font-medium mb-12">
+            {t('cta_desc')}
           </p>
-          <Link 
-            to={isAuthenticated ? '/dashboard' : '/login'} 
-            className="btn-primary bg-white text-medical-blue hover:bg-gray-100 text-lg px-10 py-4 inline-block"
+          <Link
+            to={isAuthenticated ? '/dashboard' : '/login'}
+            className="btn-primary py-6 px-16 text-lg tracking-widest"
           >
-            {isAuthenticated ? 'Go to Dashboard' : 'Start Your Assessment Now'}
+            {isAuthenticated ? t('access_dashboard') : t('initialize_protocol_cta')}
           </Link>
         </div>
       </section>
@@ -162,4 +162,3 @@ const LandingPage = () => {
 }
 
 export default LandingPage
-

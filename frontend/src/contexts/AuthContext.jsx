@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     user,
     loading,
     logout,
-    isAuthenticated: !!user
+    isAuthenticated: user ? true : false
   };
 
   return (
@@ -47,4 +47,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-

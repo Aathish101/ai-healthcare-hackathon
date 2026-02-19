@@ -3,47 +3,69 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import axios from 'axios'
 import toast from 'react-hot-toast'
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  ResponsiveContainer 
+import { useTranslation } from 'react-i18next'
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell,
+  LabelList
 } from 'recharts'
 import Chatbot from '../components/Chatbot'
 import LoadingSpinner from '../components/LoadingSpinner'
 
 const DashboardPage = () => {
+  const { t } = useTranslation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [assessments, setAssessments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [currentProfile, setCurrentProfile] = useState(null)
 
   useEffect(() => {
-    if (user) {
-      fetchAssessments()
+    if (!sessionStorage.getItem('selectedProfileId')) {
+      navigate('/profiles')
+      return
     }
-  }, [user])
+    fetchData()
+  }, [user, navigate])
 
-  const fetchAssessments = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get(
-        `http://localhost:5000/api/assessment/user/${user.uid}`
-      )
-      setAssessments(response.data.data || [])
+      const pid = sessionStorage.getItem('selectedProfileId')
+      if (!pid || !user?.uid) return;
+
+      // Fetch profile details for the image
+      const profileResponse = await axios.get(`http://localhost:5000/api/profiles/${user.uid}`)
+      const selectedProfile = profileResponse.data.data.find(p => p._id === pid)
+      setCurrentProfile(selectedProfile)
+
+      const assessmentResponse = await axios.get(`http://localhost:5000/api/assessment/${pid}`)
+      setAssessments(assessmentResponse.data.data || [])
     } catch (error) {
-      console.error('Error fetching assessments:', error)
-      toast.error('Failed to load assessments')
+      console.error('Error fetching data:', error)
+      toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
   }
 
+  // Risk Color Helper Logic
+  const getRiskColor = (score) => {
+    if (score <= 20) return "bg-red-500 text-white"
+    if (score <= 60) return "bg-yellow-400 text-black"
+    return "bg-green-500 text-white"
+  }
+
   const handleDeleteAssessment = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this assessment?')) {
+    if (!window.confirm(t('confirm_delete_assessment'))) {
       return
     }
 
@@ -52,7 +74,7 @@ const DashboardPage = () => {
         data: { userId: user.uid }
       })
       toast.success('Assessment deleted successfully')
-      fetchAssessments()
+      fetchData()
     } catch (error) {
       console.error('Error deleting assessment:', error)
       toast.error('Failed to delete assessment')
@@ -69,247 +91,313 @@ const DashboardPage = () => {
     }
   }
 
-  const latestAssessment = assessments[0]
-  const chartData = assessments
-    .slice()
-    .reverse()
-    .map((assessment, index) => ({
-      date: new Date(assessment.createdAt).toLocaleDateString(),
-      bmi: assessment.bmi || 0,
-      stressLevel: assessment.stressLevel || 0,
-      sleepHours: assessment.sleepHours || 0,
-      riskScore: assessment.riskScore || 0
-    }))
+  const latestAssessment =
+    assessments.length > 0
+      ? [...assessments].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      )[0]
+      : null;
+
+  const chartData = assessments.map((assessment) => ({
+    date: assessment.createdAt ? new Date(assessment.createdAt).toLocaleString('en-IN', {
+      month: 'short',
+      day: 'numeric'
+    }) : 'Unknown',
+    bmi: Number(assessment.bmi) || 0,
+    stressLevel: Number(assessment.stressLevel) || 0,
+    sleepHours: Number(assessment.sleepHours) || 0,
+    risk: Number(assessment.riskScore) || 0
+  }))
+
+  const riskBarData =
+    latestAssessment?.risks
+      ? Object.values(latestAssessment.risks)
+        .sort((a, b) => b.percentage - a.percentage)
+        .map((r) => ({
+          name: r.disease,
+          value: Number(r.percentage),
+          category: r.category,
+          color:
+            r.category === "High"
+              ? "#ef4444"
+              : r.category === "Moderate"
+                ? "#facc15"
+                : "#22c55e",
+        }))
+      : [];
+
+  console.log("Latest Assessment:", latestAssessment);
+  console.log("Risks Object:", latestAssessment?.risks);
+  console.log("Risk Bar Data:", riskBarData);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <LoadingSpinner />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-gray-50">
+    <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Welcome back, {user?.email?.split('@')[0]}!
-            </h1>
-            <p className="text-gray-600 mt-1">Monitor your health journey</p>
+        <div className="mb-12 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-fade-up">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-white border border-gray-100 shadow-sm overflow-hidden flex items-center justify-center shrink-0">
+              {currentProfile?.imageUrl ? (
+                <img
+                  src={`http://localhost:5000${currentProfile.imageUrl}`}
+                  alt={currentProfile.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-3xl font-black text-black opacity-20">{currentProfile?.name?.charAt(0)}</span>
+              )}
+            </div>
+            <div>
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-1 block">{t('institutional_portal')}</span>
+              <h1 className="text-4xl font-black text-black tracking-tighter uppercase leading-none">
+                {currentProfile?.name} <span className="text-gray-300">/ {t('bio_data')}</span>
+              </h1>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-2">{t('relational_context')}: {currentProfile?.relation}</p>
+            </div>
           </div>
-          <div className="flex gap-4">
-            <button
-              onClick={() => navigate('/assessment')}
-              className="btn-primary"
-            >
-              Start New Assessment
+          <div className="flex flex-wrap gap-3">
+            <button onClick={() => navigate('/profiles')} className="btn-secondary text-[10px] px-6">
+              {t('switch_instance')}
             </button>
-            <button
-              onClick={handleLogout}
-              className="btn-secondary"
-            >
-              Logout
+            <button onClick={() => navigate('/assessment')} className="btn-primary text-[10px] px-6">
+              {t('initialize_audit')}
+            </button>
+            <button onClick={handleLogout} className="text-gray-300 hover:text-black font-black text-[10px] uppercase tracking-widest px-4 transition-colors">
+              {t('terminate_session')}
             </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="card">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">
-              Latest Risk Score
-            </h3>
-            <div className="text-3xl font-bold text-medical-blue">
-              {latestAssessment ? `${latestAssessment.riskScore}/100` : 'N/A'}
+        {/* Diagnostic Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="bg-black text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform duration-700"></div>
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{t('integrity_index')}</h3>
+            <div className="text-7xl font-black tracking-tighter mb-4">
+              {latestAssessment ? latestAssessment.riskScore : '00'}
+              <span className="text-lg opacity-30 ml-2">/ 100</span>
             </div>
             {latestAssessment && (
-              <p className="text-sm text-gray-600 mt-2">
-                {latestAssessment.riskScore < 30 ? 'Low Risk' :
-                 latestAssessment.riskScore < 60 ? 'Moderate Risk' : 'High Risk'}
-              </p>
+              <div className={`inline-block px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${getRiskColor(latestAssessment.riskScore)}`}>
+                {latestAssessment.riskScore <= 20 ? t('critical_event') :
+                  latestAssessment.riskScore <= 60 ? t('cautionary') :
+                    t('optimal_status')}
+              </div>
             )}
           </div>
 
           <div className="card">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">
-              Total Assessments
-            </h3>
-            <div className="text-3xl font-bold text-medical-blue">
-              {assessments.length}
-            </div>
-            <p className="text-sm text-gray-600 mt-2">
-              Health records tracked
-            </p>
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{t('audit_cycles')}</h3>
+            <div className="text-6xl font-black text-black tracking-tighter mb-2">{assessments.length}</div>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{t('historical_logs')}</p>
           </div>
 
           <div className="card">
-            <h3 className="text-sm font-medium text-gray-500 mb-2">
-              Last Assessment
-            </h3>
-            <div className="text-lg font-semibold text-gray-900">
-              {latestAssessment 
-                ? new Date(latestAssessment.createdAt).toLocaleDateString()
-                : 'No assessments yet'}
+            <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{t('temporal_sync')}</h3>
+            <div className="text-2xl font-black text-black uppercase tracking-tighter mb-1">
+              {latestAssessment ? new Date(latestAssessment.createdAt).toLocaleDateString() : 'N/A'}
             </div>
             {latestAssessment && (
-              <p className="text-sm text-gray-600 mt-2">
-                {new Date(latestAssessment.createdAt).toLocaleTimeString()}
-              </p>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{new Date(latestAssessment.createdAt).toLocaleTimeString()}</p>
             )}
           </div>
         </div>
 
-        {/* Charts */}
-        {assessments.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* BMI Chart */}
-            <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                BMI Over Time
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="bmi" 
-                    stroke="#2563eb" 
-                    strokeWidth={2}
-                    name="BMI"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+        {/* Analytics Distribution */}
+        {assessments.length > 0 ? (
+          <div className="space-y-8 mb-16">
+            <div className="bg-white border-2 border-gray-100 rounded-[3.5rem] p-12 shadow-sm">
+              <div className="flex justify-between items-center mb-12">
+                <h3 className="text-3xl font-black text-black tracking-tighter uppercase">{t('variance_health')}</h3>
+                <div className="w-12 h-1 bg-black"></div>
+              </div>
+              <div className="h-[450px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={80}
+                      tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 900 }}
+                    />
+
+                    <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 900 }} />
+                    <Tooltip
+                      content={({ active, payload, label }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-black text-white p-6 shadow-2xl rounded-3xl border border-white/10">
+                              <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-3">{label}</p>
+                              <div className="flex items-center gap-4">
+                                <span className="text-4xl font-black tracking-tighter">{payload[0].value}%</span>
+                                <span className="text-[8px] font-black text-gray-400 uppercase leading-tight tracking-widest">{t('index_value')}</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Line type="monotone" dataKey="risk" stroke="#000000" strokeWidth={6} dot={{ r: 8, fill: '#000', strokeWidth: 4, stroke: '#fff' }} activeDot={{ r: 12, strokeWidth: 0, fill: '#000' }} animationDuration={2000} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
-            {/* Stress & Sleep Chart */}
-            <div className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Stress Level & Sleep Hours
-              </h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip />
-                  <Legend />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="stressLevel" 
-                    stroke="#ef4444" 
-                    strokeWidth={2}
-                    name="Stress Level"
-                  />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="sleepHours" 
-                    stroke="#10b981" 
-                    strokeWidth={2}
-                    name="Sleep Hours"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+            {/* Risk Breakdown BarChart */}
+            <div className="bg-white border-2 border-gray-100 rounded-[3.5rem] p-12 shadow-sm">
+              <h3 className="text-3xl font-black text-black tracking-tighter uppercase mb-12">{t('specific_risk_vectors')}</h3>
+              <div className="h-[450px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={riskBarData}
+                    margin={{ top: 20, right: 30, left: 10, bottom: 90 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      interval={0}
+                      angle={-30}
+                      textAnchor="end"
+                      height={80}
+                      tick={{ fill: '#6b7280', fontSize: 12, fontWeight: 900 }}
+                    />
+
+                    <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 900 }} />
+                    <Tooltip cursor={{ fill: '#f9fafb' }} contentStyle={{ borderRadius: '24px', border: 'none', backgroundColor: '#000', color: '#fff' }} />
+                    <Bar dataKey="value" radius={[12, 12, 0, 0]} barSize={56}>
+                      <LabelList dataKey="value" position="top" style={{ fill: '#000', fontWeight: 900, fontSize: 12 }} />
+                      {riskBarData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="card">
+                <h3 className="text-xl font-black text-black mb-10 tracking-tighter uppercase">{t('biometric_bmi')}</h3>
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="date" hide />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#9ca3af' }} />
+                      <Line type="monotone" dataKey="bmi" stroke="#000000" strokeWidth={3} dot={{ r: 4, fill: '#000' }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="card">
+                <h3 className="text-xl font-black text-black mb-10 tracking-tighter uppercase">{t('circadian_sleep_stress')}</h3>
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                      <XAxis dataKey="date" hide />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#9ca3af' }} />
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: '#000', color: '#fff' }} />
+                      <Line type="monotone" dataKey="stressLevel" stroke="#374151" strokeWidth={4} dot={{ r: 0 }} name={t('stress')} />
+                      <Line type="monotone" dataKey="sleepHours" stroke="#d1d5db" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 0 }} name={t('sleep')} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-gray-50 rounded-[4rem] text-center p-24 mb-16 border-2 border-dashed border-gray-100">
+            <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center mx-auto mb-8 shadow-sm border border-gray-100">
+              <span className="text-4xl">🛡️</span>
+            </div>
+            <h3 className="text-3xl font-black text-black mb-4 uppercase tracking-tighter">{t('zero_data_baseline')}</h3>
+            <p className="text-gray-400 max-w-sm mx-auto mb-12 font-medium leading-relaxed uppercase text-[10px] tracking-widest">{t('zero_data_desc')}</p>
+            <button onClick={() => navigate('/assessment')} className="btn-primary px-12 py-5">{t('initialize_protocol')}</button>
           </div>
         )}
 
-        {/* Assessment History */}
-        <div className="card mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">
-            Assessment History
-          </h2>
-          {assessments.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">No assessments yet</p>
-              <button
-                onClick={() => navigate('/assessment')}
-                className="btn-primary"
-              >
-                Start Your First Assessment
-              </button>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Risk Score
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      BMI
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {assessments.map((assessment) => (
-                    <tr key={assessment._id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {new Date(assessment.createdAt).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                          assessment.riskScore < 30 ? 'bg-green-100 text-green-800' :
-                          assessment.riskScore < 60 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
+        {/* Audit Logs */}
+        <div className="bg-white border-2 border-gray-100 rounded-[3.5rem] overflow-hidden shadow-sm mb-20">
+          <div className="p-10 border-b border-gray-50">
+            <h2 className="text-3xl font-black text-black tracking-tighter uppercase leading-none text-center md:text-left">{t('longitudinal_audit_records')}</h2>
+          </div>
+          <div className="overflow-x-auto px-6">
+            <table className="min-w-full">
+              <thead>
+                <tr className="bg-white">
+                  <th className="px-8 py-6 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{t('temporal_stamp')}</th>
+                  <th className="px-8 py-6 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{t('vulnerability_percent')}</th>
+                  <th className="px-8 py-6 text-left text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{t('bmi_vector')}</th>
+                  <th className="px-8 py-6 text-right text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{t('protocol_actions')}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {assessments.map((assessment) => (
+                  <tr key={assessment._id} className="group hover:bg-gray-50/50 transition-colors">
+                    <td className="px-8 py-6">
+                      <span className="text-sm font-black text-black uppercase tracking-tighter">{new Date(assessment.createdAt).toLocaleDateString()}</span>
+                      <span className="text-[8px] font-black text-gray-400 block uppercase tracking-widest mt-1 opacity-60">{new Date(assessment.createdAt).toLocaleTimeString()}</span>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-1 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${getRiskColor(assessment.riskScore).split(' ')[0]}`} style={{ width: `${assessment.riskScore}%` }}></div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${getRiskColor(assessment.riskScore)}`}>
                           {assessment.riskScore}/100
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {assessment.bmi || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => {
-                            sessionStorage.setItem('assessmentResults', JSON.stringify({
-                              assessment: {
-                                ...assessment,
-                                timestamp: assessment.createdAt
-                              },
-                              risks: assessment.risks,
-                              overallHealthScore: assessment.riskScore,
-                              recommendations: assessment.recommendations,
-                              confidenceScore: 95
-                            }))
-                            navigate('/results')
-                          }}
-                          className="text-medical-blue hover:text-medical-dark mr-4"
-                        >
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAssessment(assessment._id)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-sm font-black text-black uppercase tracking-tighter">{assessment.bmi || '---'}</td>
+                    <td className="px-8 py-6 text-right whitespace-nowrap">
+                      <button
+                        onClick={() => {
+                          sessionStorage.setItem('assessmentResults', JSON.stringify({
+                            assessment: { ...assessment, timestamp: assessment.createdAt },
+                            risks: assessment.risks,
+                            overallHealthScore: assessment.riskScore,
+                            recommendations: assessment.recommendations,
+                            confidenceScore: 95
+                          }))
+                          navigate('/results')
+                        }}
+                        className="text-black hover:opacity-100 opacity-20 font-black text-[10px] uppercase tracking-widest mr-8 transition-all"
+                      >
+                        {t('deep_audit')}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAssessment(assessment._id)}
+                        className="text-red-600 hover:text-red-700 font-black text-[10px] uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        {t('purge')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        {/* Chatbot */}
         <Chatbot userId={user?.uid} />
       </div>
     </div>
@@ -317,4 +405,3 @@ const DashboardPage = () => {
 }
 
 export default DashboardPage
-

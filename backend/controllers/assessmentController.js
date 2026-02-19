@@ -2,96 +2,91 @@ import { calculateHealthRisks } from '../services/riskEngine.js';
 import Assessment from '../models/Assessment.js';
 
 /**
- * Assessment Controller
- * Handles health assessment requests
+ * CREATE ASSESSMENT
  */
-
-export const createAssessment = async (req, res, next) => {
+export const createAssessment = async (req, res) => {
   try {
-    const { userId, ...assessmentData } = req.body;
+    const { profileId } = req.body;
 
-    if (!userId) {
+    if (!profileId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: 'Profile ID is required'
       });
     }
 
-    // Calculate BMI if not provided
-    if (!assessmentData.bmi && assessmentData.height && assessmentData.weight) {
-      assessmentData.bmi = calculateBMI(assessmentData.height, assessmentData.weight);
+    // Clone request body
+    const assessmentData = { ...req.body };
+
+    // 🔹 AUTO BMI CALCULATION
+    if (assessmentData.height && assessmentData.weight) {
+      const h = parseFloat(assessmentData.height) / 100;
+      const w = parseFloat(assessmentData.weight);
+
+      if (h > 0) {
+        assessmentData.bmi = parseFloat((w / (h * h)).toFixed(1));
+      }
     }
 
-    // Create assessment model instance for risk calculation
-    const assessmentModel = {
-      age: assessmentData.age,
-      gender: assessmentData.gender,
-      height: assessmentData.height,
-      weight: assessmentData.weight,
-      bmi: assessmentData.bmi,
-      familyHistory: assessmentData.familyHistory,
-      smoking: assessmentData.smoking,
-      alcoholConsumption: assessmentData.alcoholConsumption,
-      exerciseFrequency: assessmentData.exerciseFrequency,
-      bloodPressure: assessmentData.bloodPressure,
-      bloodSugar: assessmentData.bloodSugar,
-      stressLevel: assessmentData.stressLevel,
-      sleepHours: assessmentData.sleepHours
-    };
+    // 🔹 CALCULATE RISKS
+    const riskResults = calculateHealthRisks(assessmentData);
 
-    // Calculate health risks using AI risk engine
-    const riskResults = calculateHealthRisks(assessmentModel);
+    // 🔹 DETERMINE RISK LEVEL
+    let riskLevel = 'Low';
 
-    // Create assessment document
-    const assessment = new Assessment({
-      userId,
+    if (riskResults.overallHealthScore <= 20) {
+      riskLevel = 'High';
+    } else if (riskResults.overallHealthScore <= 60) {
+      riskLevel = 'Moderate';
+    }
+
+    // 🔹 BUILD AI SUMMARY
+    const aiSuggestion = riskResults.recommendations
+      ?.map(rec => `${rec.category}: ${rec.suggestions?.[0] || ''}`)
+      .join('. ') || '';
+
+    // 🔹 CREATE & SAVE DOCUMENT
+    const savedAssessment = await Assessment.create({
       ...assessmentData,
       riskScore: riskResults.overallHealthScore,
+      riskLevel,
       risks: riskResults.risks,
-      recommendations: riskResults.recommendations
+      recommendations: riskResults.recommendations,
+      aiSuggestion
     });
 
-    await assessment.save();
-
-    // Prepare response
-    const response = {
+    // ✅ RETURN FULL DOCUMENT (IMPORTANT FOR PDF)
+    res.status(201).json({
       success: true,
-      data: {
-        assessment: {
-          id: assessment._id,
-          userId: assessment.userId,
-          ...assessmentData,
-          riskScore: riskResults.overallHealthScore,
-          timestamp: assessment.createdAt
-        },
-        risks: riskResults.risks,
-        overallHealthScore: riskResults.overallHealthScore,
-        recommendations: riskResults.recommendations,
-        confidenceScore: riskResults.confidenceScore
-      }
-    };
+      data: savedAssessment
+    });
 
-    res.status(201).json(response);
   } catch (error) {
-    next(error);
+    console.error('Assessment creation error:', error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Internal Server Error during assessment processing'
+    });
   }
 };
 
+
 /**
- * Get all assessments for a user
+ * GET ALL ASSESSMENTS FOR A PROFILE
  */
 export const getUserAssessments = async (req, res, next) => {
   try {
-    const { userId } = req.params;
+    const { profileId } = req.params;
 
-    if (!userId) {
+    if (!profileId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID is required'
+        message: 'Profile ID is required'
       });
     }
 
-    const assessments = await Assessment.find({ userId })
+    const assessments = await Assessment.find({ profileId })
       .sort({ createdAt: -1 })
       .select('-__v');
 
@@ -99,32 +94,23 @@ export const getUserAssessments = async (req, res, next) => {
       success: true,
       data: assessments
     });
+
   } catch (error) {
     next(error);
   }
 };
 
+
 /**
- * Delete an assessment
+ * DELETE ASSESSMENT
  */
 export const deleteAssessment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { userId } = req.body;
 
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: 'User ID is required'
-      });
-    }
+    const deleted = await Assessment.findByIdAndDelete(id);
 
-    const assessment = await Assessment.findOneAndDelete({
-      _id: id,
-      userId
-    });
-
-    if (!assessment) {
+    if (!deleted) {
       return res.status(404).json({
         success: false,
         message: 'Assessment not found'
@@ -135,18 +121,8 @@ export const deleteAssessment = async (req, res, next) => {
       success: true,
       message: 'Assessment deleted successfully'
     });
+
   } catch (error) {
     next(error);
   }
 };
-
-/**
- * Calculate BMI from height and weight
- */
-function calculateBMI(height, weight) {
-  if (!height || !weight || height <= 0 || weight <= 0) {
-    return null;
-  }
-  const heightInMeters = height / 100;
-  return parseFloat((weight / (heightInMeters * heightInMeters)).toFixed(1));
-}

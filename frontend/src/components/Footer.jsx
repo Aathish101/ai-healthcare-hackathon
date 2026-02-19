@@ -1,30 +1,60 @@
-
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import BrandLogo from './BrandLogo';
+import { useTranslation } from 'react-i18next';
 
 const Footer = () => {
-    return (
-        <footer className="bg-gray-900 text-gray-300 py-12">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center">
-                    <div className="flex flex-col items-center justify-center space-y-4 mb-6">
-                        <img
-                            src="https://i.ibb.co/xSkh16zY/Chat-GPT-Image-Feb-18-2026-10-37-07-AM-removebg-preview.png"
-                            alt="Aurevia Health"
-                            className="h-24 md:h-32 w-auto object-contain"
-                        />
-                        <span className="text-3xl font-bold text-white">Ayurevia Health</span>
-                    </div>
-                    <p className="text-sm mb-4">
-                        Early Health Risk Prediction Platform
-                    </p>
-                    <p className="text-xs text-gray-500">
-                        © 2026 Ayurevia Health. This platform provides health risk assessments for informational purposes only.
-                        Consult with healthcare professionals for medical advice.
-                    </p>
-                </div>
+  const { t } = useTranslation();
+  const location = useLocation();
+
+  return (
+    <footer className="bg-black text-white py-20 px-6 border-t border-white/5">
+      <div className="max-w-7xl mx-auto flex flex-col items-center text-center">
+
+        <div className="mb-10 group">
+          <BrandLogo isDark={true} />
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-12 mb-16 w-full max-w-4xl">
+          <div className="space-y-4">
+            <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('nav_head')}</h5>
+            <div className="flex flex-col gap-2">
+              <Link to="/" className="text-xs font-bold hover:text-gray-400 transition-colors uppercase">{t('nav_index_footer')}</Link>
+              <Link to="/dashboard" className="text-xs font-bold hover:text-gray-400 transition-colors uppercase">{t('nav_portal_footer')}</Link>
             </div>
-        </footer>
-    );
+          </div>
+          <div className="space-y-4">
+            <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('protocol_head')}</h5>
+            <div className="flex flex-col gap-2">
+              <Link to="/assessment" className="text-xs font-bold hover:text-gray-400 transition-colors uppercase">{t('nav_audit_footer')}</Link>
+              <Link to="/results" className="text-xs font-bold hover:text-gray-400 transition-colors uppercase">{t('nav_analytics_footer')}</Link>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('security_head')}</h5>
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-gray-400 uppercase">ISO 27001</span>
+              <span className="text-xs font-bold text-gray-400 uppercase">HIPAA Compliant</span>
+            </div>
+          </div>
+          <div className="space-y-4">
+            <h5 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{t('legal_head')}</h5>
+            <div className="flex flex-col gap-2">
+              <Link to="/terms" className="text-xs font-bold hover:text-gray-400 transition-colors uppercase">{t('nav_terms_footer')}</Link>
+              <Link to="/privacy" className="text-xs font-bold hover:text-gray-400 transition-colors uppercase">{t('nav_privacy_footer')}</Link>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.4em] mb-4">
+          © {new Date().getFullYear()} Aurevia Health Integrity Labs
+        </p>
+
+        <p className="text-[10px] text-gray-700 font-bold uppercase tracking-widest leading-loose max-w-3xl border-t border-white/5 pt-8">
+          {t('footer_disclaimer')}
+        </p>
+      </div>
+    </footer>
+  );
 };
 
 export default Footer;

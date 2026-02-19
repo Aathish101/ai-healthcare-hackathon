@@ -1,321 +1,273 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bar } from 'react-chartjs-2'
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-  Legend
-} from 'chart.js'
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell,
+  AreaChart,
+  Area,
+  LabelList
+} from 'recharts'
 import jsPDF from 'jspdf'
-
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend
-)
+import axios from 'axios'
+import toast from 'react-hot-toast'
+import LoadingSpinner from '../components/LoadingSpinner'
+import { useTranslation } from 'react-i18next'
 
 const ResultsPage = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [results, setResults] = useState(null)
+  const [history, setHistory] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const storedResults = sessionStorage.getItem('assessmentResults')
-    if (storedResults) {
-      setResults(JSON.parse(storedResults))
-    } else {
-      navigate('/assessment')
+    const fetchData = async () => {
+      try {
+        const storedResults = sessionStorage.getItem('assessmentResults')
+        if (!storedResults) {
+          navigate('/assessment')
+          return
+        }
+
+        const currentData = JSON.parse(storedResults)
+        if (!currentData || !currentData.risks) {
+          throw new Error('Invalid assessment data found')
+        }
+        setResults(currentData)
+
+        const pid = sessionStorage.getItem('selectedProfileId')
+        if (pid) {
+          const response = await axios.get(`http://localhost:5000/api/assessment/${pid}`)
+          setHistory(response.data.data || [])
+        }
+      } catch (error) {
+        console.error('Error fetching results data:', error)
+        toast.error('Unable to load full results. Please try again.')
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchData()
   }, [navigate])
 
-  if (!results) {
+  const getRiskColor = (score) => {
+    if (score <= 20) return "bg-red-500 text-white"
+    if (score <= 60) return "bg-yellow-400 text-black"
+    return "bg-green-500 text-white"
+  }
+
+  if (loading || !results) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-medical-blue"></div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <LoadingSpinner />
       </div>
     )
   }
 
-  const { risks, overallHealthScore, recommendations, confidenceScore, assessment } = results
+  const risks = results.risks || {}
+  const overallHealthScore = results.riskScore || 0
+  const recommendations = results.recommendations || []
+  const assessment = results
+  const confidenceScore = 100   // or calculate if needed
 
-  // Prepare chart data
-  const chartData = {
-    labels: Object.values(risks).map(r => r.disease),
-    datasets: [
-      {
-        label: 'Risk Percentage',
-        data: Object.values(risks).map(r => r.percentage),
-        backgroundColor: Object.values(risks).map(r => {
-          if (r.category === 'High') return 'rgba(239, 68, 68, 0.8)'
-          if (r.category === 'Moderate') return 'rgba(251, 191, 36, 0.8)'
-          return 'rgba(34, 197, 94, 0.8)'
-        }),
-        borderColor: Object.values(risks).map(r => {
-          if (r.category === 'High') return 'rgb(239, 68, 68)'
-          if (r.category === 'Moderate') return 'rgb(251, 191, 36)'
-          return 'rgb(34, 197, 94)'
-        }),
-        borderWidth: 2
-      }
-    ]
+  const formatDiseaseName = (name) => {
+    if (!name) return 'Unknown'
+    return name
+      .replace(/([A-Z])/g, ' $1')
+      .replace(/^./, str => str.toUpperCase())
+      .trim()
   }
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false
-      },
-      title: {
-        display: true,
-        text: 'Health Risk Assessment Results',
-        font: {
-          size: 18,
-          weight: 'bold'
-        }
-      },
-      tooltip: {
-        callbacks: {
-          label: function(context) {
-            const risk = Object.values(risks)[context.dataIndex]
-            return `${risk.disease}: ${risk.percentage}% (${risk.category} Risk)`
-          }
-        }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 100,
-        ticks: {
-          callback: function(value) {
-            return value + '%'
-          }
-        }
-      }
-    }
-  }
+  const riskBarData = risks
+    ? Object.entries(risks).map(([key, r]) => ({
+      name: formatDiseaseName(r.disease || key),
+      value: Number(r.percentage) || 0,
+      category: r.category || 'Unknown',
+      color: r.category === 'High' ? '#ef4444' : r.category === 'Moderate' ? '#facc15' : '#22c55e'
+    }))
+    : []
+
+  const trendData = Array.isArray(history) ? history.map(item => ({
+    date: item.createdAt ? new Date(item.createdAt).toLocaleString('en-IN', {
+      month: 'short',
+      day: 'numeric'
+    }) : 'Unknown',
+    risk: Number(item.riskScore) || 0
+  })) : []
 
   const downloadPDF = () => {
+    if (!results || !assessment) return
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
-    const pageHeight = doc.internal.pageSize.getHeight()
     let yPos = 20
 
-    // Header
-    doc.setFontSize(20)
-    doc.setTextColor(37, 99, 235)
-    doc.text('Ayurevia Health Risk Assessment Report', pageWidth / 2, yPos, { align: 'center' })
-    yPos += 10
+    doc.setFontSize(24)
+    doc.setTextColor(0, 0, 0)
+    doc.text('MEDICAL AUDIT REPORT', pageWidth / 2, yPos, { align: 'center' })
+    yPos += 15
 
     doc.setFontSize(10)
-    doc.setTextColor(100, 100, 100)
-    doc.text(`Generated: ${new Date(assessment.timestamp).toLocaleString()}`, pageWidth / 2, yPos, { align: 'center' })
-    yPos += 15
+    doc.setTextColor(150, 150, 150)
+    doc.text(`ID: ${results._id} | GENERATED ON ${new Date().toLocaleString()}`, pageWidth / 2, yPos, { align: 'center' })
+    yPos += 20
 
-    // Overall Health Score
-    doc.setFontSize(16)
-    doc.setTextColor(0, 0, 0)
-    doc.text('Overall Health Score', 20, yPos)
-    yPos += 8
-    doc.setFontSize(24)
-    doc.setTextColor(37, 99, 235)
-    doc.text(`${overallHealthScore}/100`, 20, yPos)
-    yPos += 10
-
-    // Confidence Score
     doc.setFontSize(12)
     doc.setTextColor(0, 0, 0)
-    doc.text(`Confidence Score: ${confidenceScore}%`, 20, yPos)
+    doc.text(`OVERALL INTEGRITY SCORE: ${overallHealthScore}/100`, 20, yPos)
     yPos += 15
 
-    // Risk Breakdown
-    doc.setFontSize(14)
-    doc.setTextColor(0, 0, 0)
-    doc.text('Risk Breakdown:', 20, yPos)
-    yPos += 8
-
+    doc.text('RISK ANALYSIS:', 20, yPos)
+    yPos += 10
+    doc.setFontSize(10)
     Object.values(risks).forEach(risk => {
-      if (yPos > pageHeight - 30) {
-        doc.addPage()
-        yPos = 20
-      }
-
-      doc.setFontSize(11)
-      doc.setTextColor(0, 0, 0)
-      doc.text(`${risk.disease}: ${risk.percentage}% (${risk.category} Risk)`, 25, yPos)
+      doc.text(`- ${risk.disease.toUpperCase()}: ${risk.percentage}% (${risk.category.toUpperCase()})`, 25, yPos)
       yPos += 7
     })
 
-    yPos += 5
-
-    // Recommendations
-    if (yPos > pageHeight - 40) {
-      doc.addPage()
-      yPos = 20
-    }
-
-    doc.setFontSize(14)
-    doc.text('Personalized Recommendations:', 20, yPos)
+    yPos += 10
+    doc.setFontSize(12)
+    doc.text('ADVISORY:', 20, yPos)
     yPos += 8
-
     recommendations.forEach(rec => {
-      if (yPos > pageHeight - 30) {
-        doc.addPage()
-        yPos = 20
-      }
-
-      doc.setFontSize(11)
-      doc.setTextColor(37, 99, 235)
-      doc.text(`${rec.category}:`, 25, yPos)
+      doc.setFontSize(10)
+      doc.text(`${rec.category.toUpperCase()} (${rec.priority.toUpperCase()} PRIORITY)`, 25, yPos)
       yPos += 6
-
-      rec.suggestions.forEach(suggestion => {
-        if (yPos > pageHeight - 20) {
-          doc.addPage()
-          yPos = 20
-        }
-        doc.setFontSize(10)
-        doc.setTextColor(0, 0, 0)
-        doc.text(`• ${suggestion}`, 30, yPos)
+      rec.suggestions.forEach(s => {
+        doc.text(`• ${s}`, 30, yPos)
         yPos += 6
       })
-      yPos += 3
+      yPos += 4
     })
 
-    // Disclaimer
-    if (yPos > pageHeight - 40) {
-      doc.addPage()
-      yPos = 20
-    }
-
-    doc.setFontSize(9)
-    doc.setTextColor(100, 100, 100)
-    doc.text(
-      'Disclaimer: This assessment is for informational purposes only and should not replace professional medical advice. Please consult with healthcare professionals for medical decisions.',
-      20,
-      yPos,
-      { maxWidth: pageWidth - 40, align: 'justify' }
-    )
-
-    doc.save(`Ayurevia-Health-Report-${new Date().toISOString().split('T')[0]}.pdf`)
-  }
-
-  const getHealthScoreColor = (score) => {
-    if (score >= 70) return 'text-green-600'
-    if (score >= 50) return 'text-yellow-600'
-    return 'text-red-600'
-  }
-
-  const getHealthScoreBg = (score) => {
-    if (score >= 70) return 'bg-green-100'
-    if (score >= 50) return 'bg-yellow-100'
-    return 'bg-red-100'
+    doc.save(`Medical_Audit_${new Date().toISOString()}.pdf`)
   }
 
   return (
-    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Your Health Assessment Results</h1>
-          <p className="text-xl text-gray-600">
-            Generated on {new Date(assessment.timestamp).toLocaleString()}
+    <div className="min-h-screen py-16 px-4 bg-white">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-16 animate-fade-up">
+          <span className="inline-block px-4 py-1.5 mb-4 text-[10px] font-black tracking-[0.3em] text-white uppercase bg-black rounded-full">
+            {t('diagnostic_outcome')}
+          </span>
+          <h1 className="text-6xl font-black text-black mb-6 tracking-tighter">
+            {t('integrity_results')}
+          </h1>
+          <p className="text-xl text-gray-400 font-medium">
+            {t('subject')}: {sessionStorage.getItem('selectedProfileName')} • {new Date(assessment?.createdAt).toLocaleDateString()}
           </p>
         </div>
 
-        {/* Overall Health Score */}
-        <div className="card mb-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Overall Health Score</h2>
-            <div className={`inline-flex items-center justify-center w-48 h-48 rounded-full ${getHealthScoreBg(overallHealthScore)} mb-4`}>
-              <div className="text-center">
-                <div className={`text-6xl font-bold ${getHealthScoreColor(overallHealthScore)}`}>
-                  {overallHealthScore}
-                </div>
-                <div className="text-gray-600 text-sm mt-2">out of 100</div>
-              </div>
-            </div>
-            <p className="text-gray-600 mb-4">
-              Confidence Score: <span className="font-semibold">{confidenceScore}%</span>
-            </p>
-            <p className="text-sm text-gray-500">
-              Based on comprehensive analysis of your health indicators
-            </p>
-          </div>
-        </div>
-
-        {/* Risk Breakdown Chart */}
-        <div className="card mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Risk Breakdown</h2>
-          <div className="h-96">
-            <Bar data={chartData} options={chartOptions} />
-          </div>
-        </div>
-
-        {/* Detailed Risk Cards */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {Object.values(risks).map((risk, index) => (
-            <div key={index} className="card">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">{risk.disease}</h3>
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-600">Risk Level</span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                    risk.category === 'High' ? 'bg-red-100 text-red-800' :
-                    risk.category === 'Moderate' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
-                    {risk.category}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div
-                    className={`h-3 rounded-full ${
-                      risk.category === 'High' ? 'bg-red-500' :
-                      risk.category === 'Moderate' ? 'bg-yellow-500' :
-                      'bg-green-500'
-                    }`}
-                    style={{ width: `${risk.percentage}%` }}
-                  ></div>
-                </div>
-                <div className="text-right text-sm text-gray-600 mt-1">
-                  {risk.percentage}%
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 animate-slide-in">
+          <div className="md:col-span-2 bg-black text-white p-12 rounded-[3rem] shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 group-hover:scale-110 transition-transform duration-700"></div>
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div>
+                <h3 className="text-xs font-black text-gray-500 uppercase tracking-widest mb-6">{t('aggregate_health_index')}</h3>
+                <div className="text-9xl font-black tracking-tighter mb-4">{overallHealthScore}</div>
+                <div className="flex items-center gap-4">
+                  <div className={`px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${getRiskColor(overallHealthScore)}`}>
+                    {overallHealthScore <= 20 ? t('critical_observation') :
+                      overallHealthScore <= 60 ? t('cautionary') :
+                        t('optimal_status')}
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{t('confidence')}: {confidenceScore}%</span>
                 </div>
               </div>
             </div>
-          ))}
+          </div>
+
+          <div className="bg-white border-2 border-gray-100 p-10 rounded-[3rem] shadow-sm flex flex-col justify-center items-center text-center">
+            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mb-6 border border-gray-100">
+              <span className="text-2xl font-black text-black">{sessionStorage.getItem('selectedProfileName')?.charAt(0)}</span>
+            </div>
+            <h4 className="text-lg font-black text-black mb-1">{sessionStorage.getItem('selectedProfileName')}</h4>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6">{t('profile_snapshot')}</p>
+            <button
+              onClick={() => {
+                const data = JSON.parse(sessionStorage.getItem("assessmentResults"));
+
+                if (!data?._id) {
+                  alert("No report available");
+                  return;
+                }
+
+                // If you want backend PDF route:
+                window.open(
+                  `http://localhost:5000/api/assessment/pdf/${data._id}`,
+                  "_blank"
+                );
+
+                // OR if using jsPDF local download:
+                // downloadPDF()
+              }}
+              className="btn-primary"
+            >
+              {t('download_pdf_audit')}
+            </button>
+
+          </div>
         </div>
 
-        {/* Recommendations */}
-        <div className="card mb-8">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-6">Personalized Recommendations</h2>
-          <div className="space-y-6">
+        <div className="bg-white border-2 border-gray-100 rounded-[3rem] p-10 mb-12 shadow-sm">
+          <h3 className="text-xl font-black text-black mb-10 tracking-tighter">{t('variance_risk_indicators')}</h3>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={riskBarData} margin={{ top: 20, right: 30, left: 10, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  interval={0}
+                  tick={({ x, y, payload }) => (
+                    <text x={x} y={y + 15} textAnchor="middle" fill="#9ca3af" fontSize={10} fontWeight={700}>
+                      {payload.value.toUpperCase()}
+                    </text>
+                  )}
+                />
+                <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fill: '#9ca3af', fontSize: 10, fontWeight: 700 }} />
+                <Tooltip
+                  cursor={{ fill: '#f9fafb' }}
+                  contentStyle={{ borderRadius: '16px', border: 'none', backgroundColor: '#000', color: '#fff' }}
+                />
+                <Bar dataKey="value" radius={[12, 12, 0, 0]} barSize={56}>
+                  <LabelList dataKey="value" position="top" style={{ fill: '#000', fontWeight: 900, fontSize: 12 }} />
+                  {riskBarData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="space-y-6 mb-12">
+          <h3 className="text-3xl font-black text-black tracking-tighter mb-8">{t('personalized_advisory')}</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {recommendations.map((rec, index) => (
-              <div key={index} className="border-l-4 border-medical-blue pl-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  {rec.category}
-                  <span className={`ml-2 text-xs px-2 py-1 rounded ${
-                    rec.priority === 'high' ? 'bg-red-100 text-red-800' :
-                    rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
-                    {rec.priority.toUpperCase()} PRIORITY
+              <div key={index} className="bg-white border-2 border-gray-100 p-8 rounded-3xl hover:border-black transition-all group">
+                <div className="flex justify-between items-start mb-6">
+                  <h4 className="text-lg font-black text-black uppercase tracking-tighter">{rec.category}</h4>
+                  <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-widest ${rec.priority === 'high' ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                    {rec.priority}
                   </span>
-                </h3>
-                <ul className="space-y-2">
-                  {rec.suggestions.map((suggestion, idx) => (
-                    <li key={idx} className="text-gray-700 flex items-start">
-                      <span className="text-medical-blue mr-2">•</span>
-                      <span>{suggestion}</span>
+                </div>
+                <ul className="space-y-4">
+                  {rec.suggestions.map((s, idx) => (
+                    <li key={idx} className="flex items-start gap-4 text-sm font-medium text-gray-500 group-hover:text-black transition-colors">
+                      <span className="w-1.5 h-1.5 rounded-full bg-black mt-2 shrink-0"></span>
+                      {s}
                     </li>
                   ))}
                 </ul>
@@ -324,39 +276,22 @@ const ResultsPage = () => {
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-          <button
-            onClick={downloadPDF}
-            className="btn-primary"
-          >
-            Download PDF Report
-          </button>
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="btn-primary bg-green-600 hover:bg-green-700"
-          >
-            Go to Dashboard
-          </button>
-          <button
-            onClick={() => navigate('/assessment')}
-            className="btn-secondary"
-          >
-            Take Another Assessment
+        <div className="flex flex-wrap justify-center gap-6 mb-16">
+          <button onClick={() => navigate('/dashboard')} className="btn-primary px-12 py-5 text-sm uppercase tracking-widest">
+            {t('back_to_dashboard')}
           </button>
         </div>
 
-        {/* Disclaimer */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-8">
-          <h3 className="text-lg font-semibold text-yellow-900 mb-2">Important Disclaimer</h3>
-          <p className="text-sm text-yellow-800">
-            This health risk assessment is provided for informational and educational purposes only. 
-            It is not intended to diagnose, treat, cure, or prevent any disease. The results are based 
-            on statistical models and should not replace professional medical advice, diagnosis, or treatment. 
-            Always seek the advice of qualified health providers with any questions you may have regarding 
-            a medical condition. Never disregard professional medical advice or delay in seeking it because 
-            of something you have read in this assessment.
-          </p>
+        <div className="bg-gray-50 border border-gray-100 rounded-3xl p-8 flex gap-6 items-start">
+          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm border border-gray-100">
+            <span className="text-xl font-bold">⚠️</span>
+          </div>
+          <div>
+            <h5 className="text-sm font-black text-black uppercase tracking-widest mb-2">{t('notice_intent')}</h5>
+            <p className="text-xs text-gray-400 font-medium leading-relaxed">
+              {t('disclaimer_text')}
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -364,4 +299,3 @@ const ResultsPage = () => {
 }
 
 export default ResultsPage
-

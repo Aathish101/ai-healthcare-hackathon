@@ -20,7 +20,7 @@ export function calculateHealthRisks(assessment) {
 
   // Calculate overall health score (inverse of average risk)
   const averageRisk = Object.values(risks).reduce((sum, risk) => sum + risk.percentage, 0) / 5;
-  const overallHealthScore = Math.round(100 - averageRisk);
+  const overallRiskScore = Math.round(averageRisk);
 
   // Generate personalized recommendations
   const recommendations = generateRecommendations(assessment, risks);
@@ -30,10 +30,11 @@ export function calculateHealthRisks(assessment) {
 
   return {
     risks,
-    overallHealthScore,
+    overallHealthScore: overallRiskScore,
     recommendations,
     confidenceScore
   };
+
 }
 
 /**
@@ -66,12 +67,13 @@ function calculateDiabetesRisk(assessment) {
     else if (assessment.bloodSugar >= 100) score += 15;
   }
 
-  // Exercise factor (inverse)
-  if (assessment.exerciseFrequency < 2) score += 15;
-  else if (assessment.exerciseFrequency >= 5) score -= 10;
+  // Exercise factor
+  if (assessment.exerciseFrequency < 2 || assessment.physicalActivity === 'Sedentary') score += 15;
+  else if (assessment.exerciseFrequency >= 5 || assessment.physicalActivity === 'Intense') score -= 10;
 
-  // Alcohol consumption
-  if (assessment.alcoholConsumption === 'High') score += 10;
+  // Diet factor
+  if (assessment.dietType === 'Junk Food Frequent' || assessment.fastFoodFrequency === 'Daily') score += 20;
+  else if (assessment.dietType === 'Mixed' || assessment.dietType === 'Vegetarian') score -= 5;
 
   // Normalize to 0-100
   score = Math.max(0, Math.min(100, score));
@@ -114,11 +116,15 @@ function calculateHeartDiseaseRisk(assessment) {
   }
 
   // Exercise (protective factor)
-  if (assessment.exerciseFrequency < 2) score += 15;
-  else if (assessment.exerciseFrequency >= 5) score -= 10;
+  if (assessment.exerciseFrequency < 2 || assessment.physicalActivity === 'Sedentary') score += 15;
+  else if (assessment.exerciseFrequency >= 5 || assessment.physicalActivity === 'Intense') score -= 15;
 
   // Family history
   if (assessment.familyHistory === 'Yes') score += 15;
+
+  // Lifestyle factors
+  if (assessment.dietType === 'Junk Food Frequent' || assessment.fastFoodFrequency === 'Daily') score += 15;
+  if (assessment.stressLevel >= 8 || assessment.workingHours > 10) score += 10;
 
   // Alcohol (moderate may be protective, high is risk)
   if (assessment.alcoholConsumption === 'High') score += 10;
@@ -157,12 +163,15 @@ function calculateHypertensionRisk(assessment) {
   }
 
   // Exercise
-  if (assessment.exerciseFrequency < 2) score += 15;
-  else if (assessment.exerciseFrequency >= 5) score -= 10;
+  if (assessment.exerciseFrequency < 2 || assessment.physicalActivity === 'Sedentary') score += 15;
+  else if (assessment.exerciseFrequency >= 5 || assessment.physicalActivity === 'Intense') score -= 15;
 
   // Stress level
-  if (assessment.stressLevel >= 7) score += 15;
+  if (assessment.stressLevel >= 7 || assessment.workingHours > 10) score += 15;
   else if (assessment.stressLevel >= 5) score += 8;
+
+  // Diet (Salt/Sodium)
+  if (assessment.dietType === 'Junk Food Frequent' || assessment.fastFoodFrequency === 'Daily' || assessment.fastFoodFrequency === '2-3 times/week') score += 15;
 
   // Family history
   if (assessment.familyHistory === 'Yes') score += 12;
@@ -205,12 +214,21 @@ function calculateObesityRisk(assessment) {
   }
 
   // Exercise (major modifier)
-  if (assessment.exerciseFrequency < 2) score += 15;
-  else if (assessment.exerciseFrequency >= 5) score -= 20;
+  if (assessment.exerciseFrequency < 2 || assessment.physicalActivity === 'Sedentary') score += 20;
+  else if (assessment.exerciseFrequency >= 5 || assessment.physicalActivity === 'Intense') score -= 25;
+
+  // Diet
+  if (assessment.dietType === 'Junk Food Frequent' || assessment.fastFoodFrequency === 'Daily') score += 25;
+  else if (assessment.dietType === 'Mixed' || assessment.dietType === 'High Protein') score -= 5;
 
   // Sleep (poor sleep linked to obesity)
-  if (assessment.sleepHours < 6) score += 10;
+  if (assessment.sleepHours < 6 || assessment.sleepQuality === 'Poor') score += 15;
+  else if (assessment.sleepQuality === 'Excellent') score -= 10;
   else if (assessment.sleepHours >= 8) score -= 5;
+
+  // Water intake
+  if (assessment.waterIntake >= 3) score -= 5;
+  else if (assessment.waterIntake < 1.5) score += 5;
 
   // Age (metabolism slows)
   if (assessment.age >= 40) score += 5;
@@ -235,13 +253,18 @@ function calculateStressRisk(assessment) {
   score += assessment.stressLevel * 8; // 1-10 scale -> 8-80 points
 
   // Sleep (poor sleep increases stress)
-  if (assessment.sleepHours < 6) score += 15;
-  else if (assessment.sleepHours < 7) score += 8;
+  if (assessment.sleepHours < 6 || assessment.sleepQuality === 'Poor') score += 20;
+  else if (assessment.sleepHours < 7 || assessment.sleepQuality === 'Moderate') score += 10;
+  else if (assessment.sleepQuality === 'Excellent') score -= 15;
   else if (assessment.sleepHours >= 8) score -= 10;
 
+  // Work-life balance
+  if (assessment.workingHours > 10) score += 15;
+  if (assessment.screenTime > 8) score += 10;
+
   // Exercise (protective)
-  if (assessment.exerciseFrequency < 2) score += 15;
-  else if (assessment.exerciseFrequency >= 5) score -= 15;
+  if (assessment.exerciseFrequency < 2 || assessment.physicalActivity === 'Sedentary') score += 15;
+  else if (assessment.exerciseFrequency >= 5 || assessment.physicalActivity === 'Intense') score -= 20;
 
   // Age (younger adults may have higher stress)
   if (assessment.age >= 18 && assessment.age <= 35) score += 5;
