@@ -122,8 +122,8 @@ const response = await api.post('/api/assessment/submit', {
   gender: formData.birthGender,
   bmi: parseFloat(bmi)
 })
-      sessionStorage.setItem('assessmentResults', JSON.stringify(response.data.data))
-      toast.success('Biometric Analysis Complete')
+sessionStorage.setItem('assessmentResults', JSON.stringify(response.data))    
+toast.success('Biometric Analysis Complete')
       navigate('/results')
     } catch (err) {
       console.error('Submission failed:', err)
