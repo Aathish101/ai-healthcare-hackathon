@@ -94,48 +94,54 @@ const response = await api.get(`/api/profiles/${user.uid}`)
     }
 
     const handleCreateProfile = async (e) => {
-        e.preventDefault()
-        try {
-            const formData = new FormData()
-            formData.append('userId', user.uid)
-            formData.append('name', newProfile.name)
-            formData.append('age', newProfile.age)
-            formData.append('gender', newProfile.gender)
-            formData.append('relation', newProfile.relation)
-            if (selectedFile) {
-                formData.append('image', selectedFile)
-            }
+    e.preventDefault();
 
-const response = await api.post('/api/profiles/create', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
-            })
+    console.log("🚀 BUTTON CLICKED");
+    console.log("👤 USER:", user);
 
-            if (response.data.success) {
-                toast.success('Bio-profile registered in vault')
-                setShowCreateModal(false)
-                resetForm()
-                fetchProfiles()
-            }
-        } catch (error) {
-            console.error('Creation error:', error)
-            const errorMessage = error.response?.data?.message || 'Registration failed'
-            toast.error(errorMessage)
+    try {
+        const formData = new FormData();
+
+        if (!user || !user.uid) {
+            console.log("❌ USER MISSING");
+            toast.error("Authentication lost. Please login again.");
+            return;
         }
-    }
 
-    const resetForm = () => {
-        setNewProfile({ name: '', age: '', gender: '', relation: '' })
-        setSelectedFile(null)
-        setImagePreview(null)
-    }
+        formData.append('userId', user.uid);
+        formData.append('name', newProfile.name);
+        formData.append('age', newProfile.age);
+        formData.append('gender', newProfile.gender);
+        formData.append('relation', newProfile.relation);
 
-    if (loading) return (
+        if (selectedFile) {
+            formData.append('image', selectedFile);
+        }
+
+        console.log("📦 SENDING REQUEST...");
+
+        const response = await api.post('/api/profiles/create', formData);
+
+        console.log("✅ RESPONSE:", response.data);
+
+        if (response.data.success) {
+            toast.success('Bio-profile registered in vault');
+            setShowCreateModal(false);
+            resetForm();
+            fetchProfiles();
+        }
+    } catch (error) {
+        console.error("🔥 FULL ERROR:", error);
+        toast.error(error.response?.data?.message || "Registration failed");
+    }
+};
+if (loading) {
+    return (
         <div className="min-h-screen flex items-center justify-center bg-white">
             <LoadingSpinner />
         </div>
-    )
+    );
+}
 
     return (
         <div className="min-h-screen py-16 px-4 bg-white flex flex-col justify-center">
