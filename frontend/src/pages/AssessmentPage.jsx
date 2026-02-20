@@ -101,7 +101,6 @@ const AssessmentPage = () => {
       // Map frontend fields (biologicalAge, birthGender) to backend model (age, gender)
       const payload = {
         profileId: sessionStorage.getItem('selectedProfileId'),
-        ...formData,
         age: parseInt(formData.biologicalAge),
         gender: formData.birthGender,
         height: parseFloat(formData.height),
@@ -115,7 +114,10 @@ const AssessmentPage = () => {
         waterIntake: parseFloat(formData.waterIntake) || 0,
       }
 
-      const response = await api.post('/api/assessment/submit', payload)
+      const response = await axios.post(
+  "https://ai-healthcare-hackathon.onrender.com/api/assessment",
+  formData
+)
       sessionStorage.setItem('assessmentResults', JSON.stringify(response.data.data))
       toast.success('Biometric Analysis Complete')
       navigate('/results')
