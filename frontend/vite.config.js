@@ -11,6 +11,12 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  define: {
+    __API_BASE_URL__: JSON.stringify(
+      process.env.NODE_ENV === 'production'
+        ? 'https://ai-healthcare-hackathon.onrender.com'
+        : ''
+    )
   }
 })
-
