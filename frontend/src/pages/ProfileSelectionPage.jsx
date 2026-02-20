@@ -31,7 +31,7 @@ const ProfileSelectionPage = () => {
 
     const fetchProfiles = async () => {
         try {
-            const response = await axios.get(`http://localhost:5000/api/profiles/${user.uid}`)
+const response = await api.get(`/api/profiles/${user.uid}`)
             setProfiles(response.data.data || [])
         } catch (error) {
             console.error('Error fetching profiles:', error)
@@ -58,9 +58,9 @@ const ProfileSelectionPage = () => {
         }
 
         try {
-            const response = await axios.delete(
-                `http://localhost:5000/api/profiles/${id}`
-            )
+            const response = await api.delete(`/api/profiles/${id}`)
+
+            
 
             toast.success("Profile deleted successfully")
 
@@ -106,7 +106,7 @@ const ProfileSelectionPage = () => {
                 formData.append('image', selectedFile)
             }
 
-            const response = await axios.post('http://localhost:5000/api/profiles/create', formData, {
+await api.post('/api/profiles/create', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }
@@ -173,7 +173,7 @@ const ProfileSelectionPage = () => {
                                 <div className="w-28 h-28 rounded-full border-4 border-white shadow-xl mb-8 overflow-hidden bg-gray-50 flex items-center justify-center transition-transform group-hover:scale-105 duration-500">
                                     {profile.imageUrl ? (
                                         <img
-                                            src={`http://localhost:5000${profile.imageUrl}`}
+src={`${import.meta.env.VITE_API_BASE_URL}${profile.imageUrl}`}
                                             alt={profile.name}
                                             className="w-full h-full object-cover transition-all duration-700"
                                         />
