@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
 import LoadingSpinner from './LoadingSpinner'
+import api from '../utils/api'
 
 const Chatbot = ({ userId }) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -33,7 +34,7 @@ const Chatbot = ({ userId }) => {
     setLoading(true)
 
     try {
-      const response = await axios.post('http://localhost:5000/api/chat', {
+      const response = await api.post('/api/chat', {
         userId,
         question: userMessage
       })

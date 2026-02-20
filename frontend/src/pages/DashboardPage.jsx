@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import axios from 'axios'
+import api from '../utils/api'
 import toast from 'react-hot-toast'
 import { useTranslation } from 'react-i18next'
 import {
@@ -43,11 +43,11 @@ const DashboardPage = () => {
       if (!pid || !user?.uid) return;
 
       // Fetch profile details for the image
-      const profileResponse = await axios.get(`http://localhost:5000/api/profiles/${user.uid}`)
+      const profileResponse = await api.get(`/api/profiles/${user.uid}`)
       const selectedProfile = profileResponse.data.data.find(p => p._id === pid)
       setCurrentProfile(selectedProfile)
 
-      const assessmentResponse = await axios.get(`http://localhost:5000/api/assessment/${pid}`)
+      const assessmentResponse = await api.get(`/api/assessment/${pid}`)
       setAssessments(assessmentResponse.data.data || [])
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -70,7 +70,7 @@ const DashboardPage = () => {
     }
 
     try {
-      await axios.delete(`http://localhost:5000/api/assessment/${id}`, {
+      await api.delete(`/api/assessment/${id}`, {
         data: { userId: user.uid }
       })
       toast.success('Assessment deleted successfully')
@@ -147,8 +147,7 @@ const DashboardPage = () => {
             <div className="w-20 h-20 rounded-full bg-white border border-gray-100 shadow-sm overflow-hidden flex items-center justify-center shrink-0">
               {currentProfile?.imageUrl ? (
                 <img
-                  src={`http://localhost:5000${currentProfile.imageUrl}`}
-                  alt={currentProfile.name}
+src={`${import.meta.env.VITE_API_BASE_URL}${currentProfile.imageUrl}`}                  alt={currentProfile.name}
                   className="w-full h-full object-cover"
                 />
               ) : (

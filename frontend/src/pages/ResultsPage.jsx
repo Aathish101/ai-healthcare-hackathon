@@ -21,6 +21,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useTranslation } from 'react-i18next'
+import api from '../utils/api'
 
 const ResultsPage = () => {
   const { t } = useTranslation()
@@ -46,8 +47,7 @@ const ResultsPage = () => {
 
         const pid = sessionStorage.getItem('selectedProfileId')
         if (pid) {
-          const response = await axios.get(`http://localhost:5000/api/assessment/${pid}`)
-          setHistory(response.data.data || [])
+          const response = await api.get(`/api/assessment/${pid}`)
         }
       } catch (error) {
         console.error('Error fetching results data:', error)
@@ -203,10 +203,9 @@ const ResultsPage = () => {
 
                 // If you want backend PDF route:
                 window.open(
-                  `http://localhost:5000/api/assessment/pdf/${data._id}`,
-                  "_blank"
-                );
-
+  `${import.meta.env.VITE_API_BASE_URL}/api/assessment/pdf/${data._id}`,
+  "_blank"
+);
                 // OR if using jsPDF local download:
                 // downloadPDF()
               }}

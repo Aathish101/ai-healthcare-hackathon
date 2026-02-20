@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import axios from 'axios'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useTranslation } from 'react-i18next'
@@ -116,7 +115,7 @@ const AssessmentPage = () => {
         waterIntake: parseFloat(formData.waterIntake) || 0,
       }
 
-      const response = await axios.post('http://localhost:5000/api/assessment/submit', payload)
+      const response = await api.post('/api/assessment/submit', payload)
       sessionStorage.setItem('assessmentResults', JSON.stringify(response.data.data))
       toast.success('Biometric Analysis Complete')
       navigate('/results')
