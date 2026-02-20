@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useTranslation } from 'react-i18next'
+import api from '../utils/api'
 
 const AssessmentPage = () => {
   const { t } = useTranslation()
