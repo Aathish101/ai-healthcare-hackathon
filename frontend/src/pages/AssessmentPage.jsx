@@ -114,10 +114,7 @@ const AssessmentPage = () => {
         waterIntake: parseFloat(formData.waterIntake) || 0,
       }
 
-      const response = await axios.post(
-  "https://ai-healthcare-hackathon.onrender.com/api/assessment",
-  formData
-)
+ const response = await api.post('/api/assessment', payload)
       sessionStorage.setItem('assessmentResults', JSON.stringify(response.data.data))
       toast.success('Biometric Analysis Complete')
       navigate('/results')
