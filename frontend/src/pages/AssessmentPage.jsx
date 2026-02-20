@@ -115,7 +115,13 @@ const AssessmentPage = () => {
         waterIntake: parseFloat(formData.waterIntake) || 0,
       }
 
-const response = await api.post('/api/assessment/submit', payload)  
+const response = await api.post('/api/assessment/submit', {
+  ...formData,
+  profileId: sessionStorage.getItem('selectedProfileId'),
+  age: parseInt(formData.biologicalAge),
+  gender: formData.birthGender,
+  bmi: parseFloat(bmi)
+})
       sessionStorage.setItem('assessmentResults', JSON.stringify(response.data.data))
       toast.success('Biometric Analysis Complete')
       navigate('/results')
