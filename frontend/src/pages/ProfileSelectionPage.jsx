@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import axios from 'axios'
+import api from '../api'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { useTranslation } from 'react-i18next'
@@ -106,7 +106,7 @@ const response = await api.get(`/api/profiles/${user.uid}`)
                 formData.append('image', selectedFile)
             }
 
-await api.post('/api/profiles/create', formData, {
+const response = await api.post('/api/profiles/create', formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data'
                 }

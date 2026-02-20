@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../firebase";
@@ -53,7 +53,8 @@ const LoginPage = () => {
             setLoading(true);
             setError("");
             setMessage("");
-            await axios.post("http://localhost:5000/api/auth/send-otp", { email });
+const response = await api.post("/api/auth/send-otp", { email });
+
             setShowOtpInput(true);
             setMessage("Security code transmitted.");
         } catch (err) {
@@ -74,7 +75,7 @@ const LoginPage = () => {
         setError('');
 
         try {
-            const response = await axios.post('http://localhost:5000/api/auth/verify-otp', { email, otp });
+            const response =  await api.post('/api/auth/verify-otp', { email, otp });
             if (response.data.success) {
                 navigate("/dashboard");
             }
